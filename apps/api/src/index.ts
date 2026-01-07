@@ -460,16 +460,14 @@ app.post("/expense-requests/:id/request-payment", authRequired(), async (c) => {
   const now = isoNow();
   item.status = "payment_requested";
   item.actualTotal = input.data.actualTotal;
-  item.receipts = [
-    ...(item.receipts ?? []),
-    ...input.data.receipts.map((r) => ({
-      id: crypto.randomUUID(),
-      label: r.label,
-      url: r.url,
-      uploadedAt: now,
-      uploadedByRole: byRole as any,
-    })),
-  ];
+  // 지급요청 재제출 시 최신 영수증/금액으로 덮어씀(이력은 actionLogs로 추적)
+  item.receipts = input.data.receipts.map((r) => ({
+    id: crypto.randomUUID(),
+    label: r.label,
+    url: r.url,
+    uploadedAt: now,
+    uploadedByRole: byRole as any,
+  }));
   item.workflow = { ...(item.workflow ?? {}), paymentRequestedAt: now };
   logAction(item, { byRole, type: "request_payment", note: input.data.note });
   await pushNotification({
@@ -545,7 +543,12 @@ app.post("/expense-requests/:id/reject", authRequired(), async (c) => {
     return c.json({ error: "INVALID_STATE", status: item.status }, 409);
   }
 
-  item.status = "rejected";
+  // (B) 지급요청 단계 반려는 예산승인 상태로 되돌림(결재 재진행 없이 보완 후 재요청)
+  if (item.status === "payment_requested" && byRole === "financeStaff") {
+    item.status = "budget_approved";
+  } else {
+    item.status = "rejected";
+  }
   item.rejection = {
     reason: input.data.reason,
     rejectedAt: isoNow(),
@@ -554,7 +557,10 @@ app.post("/expense-requests/:id/reject", authRequired(), async (c) => {
   logAction(item, { byRole, type: "reject", note: input.data.reason });
   await pushNotification({
     toRole: "drafter",
-    message: `반려됨: ${item.eventName} (${input.data.reason})`,
+    message:
+      item.status === "budget_approved"
+        ? `지급요청 보완 필요: ${item.eventName} (${input.data.reason})`
+        : `반려됨: ${item.eventName} (${input.data.reason})`,
     expenseRequestId: item.id,
   });
 
