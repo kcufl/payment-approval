@@ -1,0 +1,29 @@
+{
+  "name": "@payment/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsup src/index.ts --format esm --out-dir dist",
+    "start": "node dist/index.js",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "echo \"(api) lint not configured yet\""
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.1",
+    "hono": "^4.6.12",
+    "@payment/shared": "workspace:*",
+    "bcryptjs": "^3.0.2",
+    "jsonwebtoken": "^9.0.2",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/jsonwebtoken": "^9.0.10",
+    "tsup": "^8.5.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.3"
+  }
+}
+
