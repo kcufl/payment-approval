@@ -20,6 +20,21 @@ pnpm -C apps/api dev
 pnpm -C apps/web dev
 ```
 
+## 기본 관리자 계정(개발용)
+
+API를 처음 실행하면 `apps/api/data/users.json`에 **기본 관리자 계정이 자동 생성**됩니다.
+
+- **email**: `admin@example.com`
+- **password**: `admin1234`
+
+필요하면 아래 환경변수로 바꿀 수 있습니다:
+
+```bash
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=admin1234
+JWT_SECRET=dev-secret-please-change
+```
+
 기본 API 주소는 `http://localhost:3001` 입니다. 필요하면 `apps/web/.env.local`에 아래를 설정하세요:
 
 ```bash

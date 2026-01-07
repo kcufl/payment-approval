@@ -6,4 +6,6 @@ dist
 .env
 .env.local
 .expo
+apps/api/data/*.json
+*.tsbuildinfo
 

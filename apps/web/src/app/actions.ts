@@ -3,11 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import {
-  ActorRoleSchema,
   CreateExpenseRequestInputSchema,
   MarkPaidInputSchema,
   RequestPaymentInputSchema,
 } from "@payment/shared";
+import { getSessionToken } from "@/lib/session";
 
 function getApiBaseUrl() {
   return process.env.API_BASE_URL ?? "http://localhost:3001";
@@ -133,16 +133,21 @@ export async function createExpenseRequest(formData: FormData) {
   revalidatePath("/");
 }
 
-const IdAndRoleSchema = z.object({
+const IdSchema = z.object({
   id: z.string().uuid(),
-  byRole: ActorRoleSchema,
   note: z.string().optional(),
 });
 
 async function postJson(path: string, body: unknown) {
+  const token = await getSessionToken();
+  if (!token) throw new Error("UNAUTHORIZED");
   const res = await fetch(`${getApiBaseUrl()}${path}`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    cache: "no-store",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${token}`,
+    },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -152,61 +157,52 @@ async function postJson(path: string, body: unknown) {
 }
 
 export async function requestChair(formData: FormData) {
-  const parsed = IdAndRoleSchema.parse({
+  const parsed = IdSchema.parse({
     id: formData.get("id"),
-    byRole: formData.get("byRole"),
     note: formData.get("note") ?? undefined,
   });
   await postJson(`/expense-requests/${parsed.id}/request-chair`, {
-    byRole: parsed.byRole,
     note: parsed.note,
   });
   revalidatePath("/");
 }
 
 export async function requestPastor(formData: FormData) {
-  const parsed = IdAndRoleSchema.parse({
+  const parsed = IdSchema.parse({
     id: formData.get("id"),
-    byRole: formData.get("byRole"),
     note: formData.get("note") ?? undefined,
   });
   await postJson(`/expense-requests/${parsed.id}/request-pastor`, {
-    byRole: parsed.byRole,
     note: parsed.note,
   });
   revalidatePath("/");
 }
 
 export async function approvePastor(formData: FormData) {
-  const parsed = IdAndRoleSchema.parse({
+  const parsed = IdSchema.parse({
     id: formData.get("id"),
-    byRole: formData.get("byRole"),
     note: formData.get("note") ?? undefined,
   });
   await postJson(`/expense-requests/${parsed.id}/approve-pastor`, {
-    byRole: parsed.byRole,
     note: parsed.note,
   });
   revalidatePath("/");
 }
 
 export async function approveFinanceChair(formData: FormData) {
-  const parsed = IdAndRoleSchema.parse({
+  const parsed = IdSchema.parse({
     id: formData.get("id"),
-    byRole: formData.get("byRole"),
     note: formData.get("note") ?? undefined,
   });
   await postJson(`/expense-requests/${parsed.id}/approve-finance-chair`, {
-    byRole: parsed.byRole,
     note: parsed.note,
   });
   revalidatePath("/");
 }
 
 export async function requestPayment(formData: FormData) {
-  const base = IdAndRoleSchema.parse({
+  const base = IdSchema.parse({
     id: formData.get("id"),
-    byRole: formData.get("byRole"),
     note: formData.get("note") ?? undefined,
   });
   const currency = String(formData.get("currency") ?? "KRW");
@@ -215,7 +211,6 @@ export async function requestPayment(formData: FormData) {
   const receiptUrl = String(formData.get("receiptUrl") ?? "").trim();
 
   const payload = RequestPaymentInputSchema.parse({
-    byRole: base.byRole,
     note: base.note,
     actualTotal: { currency, amount: actualAmount },
     receipts:
@@ -227,16 +222,14 @@ export async function requestPayment(formData: FormData) {
 }
 
 export async function markPaid(formData: FormData) {
-  const base = IdAndRoleSchema.parse({
+  const base = IdSchema.parse({
     id: formData.get("id"),
-    byRole: formData.get("byRole"),
     note: formData.get("note") ?? undefined,
   });
   const currency = String(formData.get("currency") ?? "KRW");
   const paidAmount = formData.get("paidAmount");
 
   const payload = MarkPaidInputSchema.parse({
-    byRole: base.byRole,
     note: base.note,
     paidAmount: { currency, amount: paidAmount },
   });
@@ -245,9 +238,8 @@ export async function markPaid(formData: FormData) {
 }
 
 export async function rejectExpenseRequest(formData: FormData) {
-  const base = IdAndRoleSchema.parse({
+  const base = IdSchema.parse({
     id: formData.get("id"),
-    byRole: formData.get("byRole"),
     note: formData.get("note") ?? undefined,
   });
   const reason = z
@@ -257,7 +249,6 @@ export async function rejectExpenseRequest(formData: FormData) {
     .parse(formData.get("reason") ?? "");
 
   await postJson(`/expense-requests/${base.id}/reject`, {
-    byRole: base.byRole,
     note: base.note,
     reason,
   });

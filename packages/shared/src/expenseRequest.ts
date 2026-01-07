@@ -139,7 +139,8 @@ export type CreateExpenseRequestInput = z.infer<
 >;
 
 export const ExpenseRequestActionInputSchema = z.object({
-  byRole: ActorRoleSchema,
+  // API에서 인증된 사용자 role로 강제 주입(클라이언트에서는 생략 가능)
+  byRole: ActorRoleSchema.optional(),
   note: z.string().trim().max(2000).optional(),
 });
 

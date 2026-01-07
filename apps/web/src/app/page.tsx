@@ -8,31 +8,28 @@ import {
   requestPastor,
   requestPayment,
 } from "./actions";
-import { listExpenseRequests, listNotifications } from "../lib/api";
-import type { ActorRole, ExpenseRequest } from "@payment/shared";
+import { listExpenseRequests, listMyNotifications, getMe } from "../lib/api";
+import type { UserRole, ExpenseRequest } from "@payment/shared";
+import { getSessionToken } from "@/lib/session";
+import { redirect } from "next/navigation";
+import { logout } from "./login/actions";
 
-const ROLES: { value: ActorRole; label: string }[] = [
-  { value: "drafter", label: "기안자(부장/담당)" },
-  { value: "chair", label: "위원장" },
-  { value: "pastor", label: "담임목사" },
-  { value: "financeChair", label: "재정위원장" },
-  { value: "financeStaff", label: "재정부 담당" },
-];
+const ROLE_LABEL: Record<UserRole, string> = {
+  drafter: "기안자(부장/담당)",
+  chair: "위원장",
+  pastor: "담임목사",
+  financeChair: "재정위원장",
+  financeStaff: "재정부 담당",
+  admin: "관리자",
+};
 
-export default async function Home({
-  searchParams,
-}: {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
-}) {
-  const sp = (await searchParams) ?? {};
-  const roleParam = Array.isArray(sp.role) ? sp.role[0] : sp.role;
-  const role: ActorRole =
-    roleParam && ROLES.some((r) => r.value === roleParam)
-      ? (roleParam as ActorRole)
-      : "drafter";
+export default async function Home() {
+  const token = await getSessionToken();
+  if (!token) redirect("/login");
 
-  const { items } = await listExpenseRequests();
-  const { items: notifications } = await listNotifications(role);
+  const me = await getMe(token);
+  const { items } = await listExpenseRequests(token);
+  const { items: notifications } = await listMyNotifications(token);
 
   return (
     <div className="min-h-screen bg-zinc-50 font-sans text-zinc-950 dark:bg-black dark:text-zinc-50">
@@ -48,21 +45,15 @@ export default async function Home({
 
         <section className="grid gap-3 rounded-2xl border border-black/10 bg-white p-6 dark:border-white/15 dark:bg-zinc-950">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold">데모: 현재 역할</h2>
-            <form method="get" className="flex items-center gap-2">
-              <select
-                name="role"
-                defaultValue={role}
-                className="h-10 rounded-lg border border-black/15 bg-transparent px-3 text-sm outline-none dark:border-white/15"
-              >
-                {ROLES.map((r) => (
-                  <option key={r.value} value={r.value}>
-                    {r.label}
-                  </option>
-                ))}
-              </select>
-              <button className="h-10 rounded-lg bg-zinc-900 px-4 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200">
-                적용
+            <div className="grid gap-1">
+              <h2 className="text-lg font-semibold">현재 사용자</h2>
+              <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                {me.name} · {me.email} · {ROLE_LABEL[me.role]}
+              </p>
+            </div>
+            <form action={logout}>
+              <button className="h-10 rounded-lg border border-black/15 bg-transparent px-4 text-sm font-medium hover:bg-black/[.04] dark:border-white/15 dark:hover:bg-white/10">
+                로그아웃
               </button>
             </form>
           </div>
@@ -255,7 +246,7 @@ export default async function Home({
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
-                    <ActionButtons role={role} it={it} />
+                    <ActionButtons role={me.role} it={it} />
                   </div>
                 </div>
               </li>
@@ -267,11 +258,10 @@ export default async function Home({
   );
 }
 
-function ActionButtons({ role, it }: { role: ActorRole; it: ExpenseRequest }) {
+function ActionButtons({ role, it }: { role: UserRole; it: ExpenseRequest }) {
   const commonHidden = (
     <>
       <input type="hidden" name="id" value={it.id} />
-      <input type="hidden" name="byRole" value={role} />
       <input
         type="hidden"
         name="currency"
